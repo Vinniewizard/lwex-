@@ -53,6 +53,7 @@ export default function CashierModal({
   const [paymentStatus, setPaymentStatus] = useState<string>('');
   const [sandboxReason, setSandboxReason] = useState<string>('');
   const [isPolling, setIsPolling] = useState(false);
+  const [copiedType, setCopiedType] = useState<'address' | 'tag' | 'amount' | null>(null);
   
   const [depositHistory, setDepositHistory] = useState<any[]>([]);
   const [withdrawalHistory, setWithdrawalHistory] = useState<any[]>([]);
@@ -85,13 +86,50 @@ export default function CashierModal({
     }
   }, [isOpen, currentUser, isPaybillAllowed, isBtcAllowed]);
 
-  // Synchronize limits and clear states when tab changes
+  // Load persistent pending deposit if exists for current user
+  useEffect(() => {
+    if (isOpen) {
+      const userId = currentUser?.id || currentUser?.email || account.id;
+      if (userId) {
+        const stored = localStorage.getItem(`lwex_pending_deposit_${userId}`);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.address && parsed.paymentId) {
+              setDepositAddress({
+                address: parsed.address,
+                paymentId: parsed.paymentId,
+                amount: parsed.amount,
+                tag: parsed.tag || undefined
+              });
+              if (parsed.usdAmount) setAmount(parsed.usdAmount);
+              if (parsed.coin) {
+                setSelectedCoin(parsed.coin);
+                if (parsed.coin === 'BTC') setSelectedNetwork('BTC');
+                else if (parsed.coin === 'ETH') setSelectedNetwork('ETH');
+                else if (parsed.coin === 'USDTTRC20') setSelectedNetwork('TRX');
+                else if (parsed.coin === 'USDT') setSelectedNetwork('ETH');
+              }
+              if (parsed.sandboxReason) {
+                setSandboxReason(parsed.sandboxReason);
+              }
+            }
+          } catch (e) {
+            console.error('Failed to restore active pending deposit session:', e);
+          }
+        }
+      }
+    }
+  }, [isOpen, currentUser, account?.id]);
+
+  // Reset tab-specific fields when tab changes
   useEffect(() => {
     setApiError('');
     setSuccessMsg('');
-    setDepositAddress(null);
-    setSandboxReason('');
-    
+  }, [activeTab]);
+
+  // Synchronize limits without clearing the generated deposit Address
+  useEffect(() => {
     const minD = gameSettings?.minDeposit ?? 1;
     const minW = gameSettings?.minWithdrawal ?? 10;
     
@@ -100,19 +138,15 @@ export default function CashierModal({
     } else {
       if (amount < minW) setAmount(minW);
     }
-  }, [activeTab, gameSettings]);
+  }, [activeTab, gameSettings?.minDeposit, gameSettings?.minWithdrawal]);
 
   const handleAmountChange = (val: number) => {
     setAmount(val);
-    setDepositAddress(null);
-    setSandboxReason('');
     setApiError('');
   };
 
   const handleCoinChange = (coin: string) => {
     setSelectedCoin(coin);
-    setDepositAddress(null);
-    setSandboxReason('');
     setApiError('');
     if (coin === 'BTC') setSelectedNetwork('BTC');
     else if (coin === 'ETH') setSelectedNetwork('ETH');
@@ -150,11 +184,27 @@ export default function CashierModal({
         throw new Error(data.message || 'Unable to generate deposit address.');
       }
 
-      setDepositAddress({
+      const generatedObj = {
         address: data.address,
         paymentId: data.payment_id,
-        amount: data.amount
-      });
+        amount: data.amount,
+        tag: data.tag || undefined
+      };
+
+      setDepositAddress(generatedObj);
+
+      if (userId) {
+        localStorage.setItem(`lwex_pending_deposit_${userId}`, JSON.stringify({
+          address: data.address,
+          paymentId: data.payment_id,
+          amount: data.amount,
+          tag: data.tag || '',
+          usdAmount: amount,
+          coin: selectedCoin,
+          network: selectedNetwork,
+          sandboxReason: (data.isSandbox && data.sandboxReason) ? data.sandboxReason : ''
+        }));
+      }
 
       if (data.isSandbox && data.sandboxReason) {
         setSandboxReason(data.sandboxReason);
@@ -194,6 +244,9 @@ export default function CashierModal({
           setSuccessMsg(`Deposit successful! $${creditedAmount.toLocaleString()} has been credited to your wallet.`);
           setDepositAddress(null);
           setSandboxReason('');
+          if (userId) {
+            localStorage.removeItem(`lwex_pending_deposit_${userId}`);
+          }
         } else {
           if (data.status) {
             setPaymentStatus(data.status);
@@ -336,6 +389,11 @@ export default function CashierModal({
         const creditedAmount = Number(data.creditedAmount) || amount;
         onDeposit(creditedAmount);
         setSuccessMsg(`Deposit successful! $${creditedAmount.toLocaleString()} has been credited to your wallet.`);
+        setDepositAddress(null);
+        setSandboxReason('');
+        if (userId) {
+          localStorage.removeItem(`lwex_pending_deposit_${userId}`);
+        }
       } else {
         if (!targetAddress.trim()) {
           throw new Error('Enter the receiving wallet address.');
@@ -824,16 +882,20 @@ export default function CashierModal({
                                   onClick={() => {
                                     if (depositAddress?.address) {
                                       navigator.clipboard.writeText(depositAddress.address);
-                                      setSuccessMsg('Address copied to clipboard!');
-                                      setTimeout(() => setSuccessMsg(''), 2000);
+                                      setCopiedType('address');
+                                      setTimeout(() => setCopiedType(null), 2000);
                                     }
                                   }}
-                                  className="text-slate-400 hover:text-white transition-colors cursor-pointer p-1"
+                                  className="text-slate-400 hover:text-white transition-colors cursor-pointer p-1 flex items-center justify-center min-w-8 min-h-8"
                                   title="Copy Wallet Address"
                                 >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                  </svg>
+                                  {copiedType === 'address' ? (
+                                    <span className="text-[10px] text-green-400 font-bold uppercase animate-pulse">Copied</span>
+                                  ) : (
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                    </svg>
+                                  )}
                                 </button>
                               </div>
                             </div>
@@ -853,16 +915,20 @@ export default function CashierModal({
                                     onClick={() => {
                                       if (depositAddress?.tag) {
                                         navigator.clipboard.writeText(depositAddress.tag);
-                                        setSuccessMsg('Memo copied to clipboard!');
-                                        setTimeout(() => setSuccessMsg(''), 2000);
+                                        setCopiedType('tag');
+                                        setTimeout(() => setCopiedType(null), 2000);
                                       }
                                     }}
-                                    className="text-slate-400 hover:text-white transition-colors cursor-pointer p-1"
+                                    className="text-slate-400 hover:text-white transition-colors cursor-pointer p-1 flex items-center justify-center min-w-8 min-h-8"
                                     title="Copy Memo"
                                   >
-                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                    </svg>
+                                    {copiedType === 'tag' ? (
+                                      <span className="text-[10px] text-green-400 font-bold uppercase animate-pulse">Copied</span>
+                                    ) : (
+                                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                      </svg>
+                                    )}
                                   </button>
                                 </div>
                               </div>
@@ -883,16 +949,20 @@ export default function CashierModal({
                                   onClick={() => {
                                     if (depositAddress?.amount) {
                                       navigator.clipboard.writeText(String(depositAddress.amount));
-                                      setSuccessMsg('Amount copied to clipboard!');
-                                      setTimeout(() => setSuccessMsg(''), 2000);
+                                      setCopiedType('amount');
+                                      setTimeout(() => setCopiedType(null), 2000);
                                     }
                                   }}
-                                  className="text-slate-400 hover:text-yellow-400 transition-all cursor-pointer p-0.5"
+                                  className="text-slate-400 hover:text-yellow-400 transition-all cursor-pointer p-0.5 flex items-center justify-center min-w-8 min-h-8"
                                   title="Copy Amount"
                                 >
-                                  <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                  </svg>
+                                  {copiedType === 'amount' ? (
+                                    <span className="text-[10px] text-green-400 font-bold uppercase animate-pulse">Copied</span>
+                                  ) : (
+                                    <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                    </svg>
+                                  )}
                                 </button>
                               </div>
                               <p className="text-[9px] text-slate-400 font-medium">
@@ -938,10 +1008,14 @@ export default function CashierModal({
                             onClick={() => {
                               setDepositAddress(null);
                               setSandboxReason('');
+                              const userId = currentUser?.id || currentUser?.email || account.id;
+                              if (userId) {
+                                localStorage.removeItem(`lwex_pending_deposit_${userId}`);
+                              }
                             }}
                             className="w-full bg-slate-905 hover:bg-slate-800 text-slate-400 dark:text-slate-300 border border-slate-800/60 text-[10px] uppercase font-bold py-2 rounded-md transition-colors cursor-pointer"
                           >
-                            Enter Different Amount / Start Over
+                            Enter Different Amount / Start Over / Discard Request
                           </button>
                         </div>
                       )}
