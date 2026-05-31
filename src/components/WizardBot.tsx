@@ -81,7 +81,7 @@ export default function WizardBot({
                   currentUser?.email?.toLowerCase().includes('lucasantiago');
 
   // Navigation tabs:
-  const [botTab, setBotTab] = useState<'signals' | 'telegram' | 'onboard' | 'qa' | 'ads' | 'notifs' | 'group'>(isAdmin ? 'signals' : 'qa');
+  const [botTab, setBotTab] = useState<'signals' | 'telegram' | 'onboard' | 'qa' | 'ads' | 'notifs' | 'group'>('signals');
   // Telegram Sub tabs:
   const [tgSubTab, setTgSubTab] = useState<'simulator' | 'api_settings' | 'members'>('simulator');
 
@@ -611,18 +611,16 @@ export default function WizardBot({
 
       {/* TOP NAVIGATION TABS */}
       <div className="flex overflow-x-auto whitespace-nowrap border-b border-gray-150 dark:border-zinc-850 bg-slate-50 dark:bg-zinc-900 text-xs font-bold uppercase tracking-wider select-none scrollbar-hide">
-        {isAdmin && (
-          <button 
-            onClick={() => setBotTab('signals')}
-            className={`flex-1 py-2.5 px-3 text-center border-b-2 transition-all shrink-0 ${
-              botTab === 'signals' 
-                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-zinc-950' 
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            🔮 Signals
-          </button>
-        )}
+        <button 
+          onClick={() => setBotTab('signals')}
+          className={`flex-1 py-2.5 px-3 text-center border-b-2 transition-all shrink-0 ${
+            botTab === 'signals' 
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-zinc-950' 
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+          }`}
+        >
+          🔮 Signals
+        </button>
         {isAdmin && (
           <button 
             onClick={() => setBotTab('telegram')}
@@ -674,17 +672,19 @@ export default function WizardBot({
             ⚙️ Onboard
           </button>
         )}
-        <button 
-          onClick={() => setBotTab('qa')}
-          className={`flex-1 py-2.5 px-3 text-center border-b-2 transition-all flex items-center justify-center space-x-1 shrink-0 ${
-            botTab === 'qa' 
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-zinc-950' 
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <MessageSquare className="w-3 h-3 text-emerald-500" />
-          <span>Support</span>
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={() => setBotTab('qa')}
+            className={`flex-1 py-2.5 px-3 text-center border-b-2 transition-all flex items-center justify-center space-x-1 shrink-0 ${
+              botTab === 'qa' 
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-zinc-950' 
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-3 h-3 text-emerald-500" />
+            <span>Support</span>
+          </button>
+        )}
         <button 
           onClick={() => setBotTab('group')}
           className={`flex-1 py-2.5 px-3 text-center border-b-2 transition-all flex items-center justify-center space-x-1 shrink-0 ${
@@ -701,7 +701,7 @@ export default function WizardBot({
       {/* MAIN TAB PANELS */}
       <div className="flex-1 overflow-y-auto max-h-[460px] scrollbar-thin flex flex-col min-h-[380px]">
         {/* ============ TAB: SIGNALS & CHAT ============ */}
-        {botTab === 'signals' && isAdmin && (
+        {botTab === 'signals' && (
           <div className="flex flex-col flex-1 pb-4">
             {/* Signal overlay widget */}
             <div className={`p-4 border-b ${
@@ -1457,7 +1457,7 @@ export default function WizardBot({
         )}
 
         {/* ============ TAB: DIRECT PLATFORM Q&A ============ */}
-        {botTab === 'qa' && (
+        {botTab === 'qa' && isAdmin && (
           <div className="flex flex-col flex-1 pb-4">
             <div className={`p-4 border-b ${
               isDark ? 'border-zinc-850 bg-zinc-900/40' : 'border-gray-100 bg-gray-50/20'

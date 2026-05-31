@@ -26,7 +26,6 @@ const { Pool } = pg;
 let pgPoolInstance: pg.Pool | null = null;
 let pgBootstrapPromise: Promise<void> | null = null;
 let d1DbInstance: any = null;
-let useSqliteFallback = false;
 let sqliteDbInstance: any = null;
 
 function convertQueryPlaceholders(query: string): string {
@@ -257,12 +256,13 @@ function getD1Database() {
   const dbUrl = process.env.DATABASE_URL;
   const isPostgres = dbUrl && (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
 
-  // Ensure local SQLite is parsed and ready as a standby fallback
   let localDb: any = null;
-  try {
-    localDb = getSqliteInstance();
-  } catch (err) {
-    console.error('[D1 Setup] SQLite setup failed:', err);
+  if (!isPostgres) {
+    try {
+      localDb = getSqliteInstance();
+    } catch (err) {
+      console.error('[D1 Setup] SQLite setup failed:', err);
+    }
   }
 
   if (isPostgres) {
@@ -452,9 +452,10 @@ function getD1Database() {
           console.error('If you are testing locally or have deployed services across different regions, use the EXTERNAL Database Connection String instead.');
           console.error('FIX: Paste your Render "External Database URL" into your Render DATABASE_URL environment setting.');
         }
-        console.error('\n🛡️ SAFETY FALLBACK: Engaging local SQLite engine to keep exchange platform fully active.');
         console.error('======================================================================\n');
-        useSqliteFallback = true;
+        // Do NOT useSqliteFallback. If the user provided DATABASE_URL, they expect data persistence.
+        // Falling back to SQLite secretly causes silent data loss on Cloud Run.
+        throw err;
       } finally {
         if (client) client.release();
       }
@@ -478,10 +479,6 @@ function getD1Database() {
 
       async first<T = any>(): Promise<T | null> {
         if (pgBootstrapPromise) await pgBootstrapPromise;
-        if (useSqliteFallback && localDb) {
-          const res = await localDb.prepare(this.query).bind(...this.boundValues).first();
-          return res as Promise<T | null>;
-        }
         try {
           const pgQuery = convertQueryPlaceholders(this.query);
           const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
@@ -494,9 +491,6 @@ function getD1Database() {
 
       async run(): Promise<{ success: boolean }> {
         if (pgBootstrapPromise) await pgBootstrapPromise;
-        if (useSqliteFallback && localDb) {
-          return localDb.prepare(this.query).bind(...this.boundValues).run();
-        }
         try {
           const pgQuery = convertQueryPlaceholders(this.query);
           await pgPoolInstance!.query(pgQuery, this.boundValues);
@@ -509,10 +503,6 @@ function getD1Database() {
 
       async all<T = any>(): Promise<{ results: T[] }> {
         if (pgBootstrapPromise) await pgBootstrapPromise;
-        if (useSqliteFallback && localDb) {
-          const res = await localDb.prepare(this.query).bind(...this.boundValues).all();
-          return res as Promise<{ results: T[] }>;
-        }
         try {
           const pgQuery = convertQueryPlaceholders(this.query);
           const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
@@ -529,9 +519,6 @@ function getD1Database() {
         return new PostgresPreparedStatement(query);
       },
       exec(query: string) {
-        if (useSqliteFallback && localDb) {
-          return localDb.exec(query);
-        }
         try {
           return pgPoolInstance!.query(query);
         } catch (err: any) {
