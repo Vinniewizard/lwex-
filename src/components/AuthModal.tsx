@@ -17,6 +17,13 @@ export default function AuthModal({ isOpen, onClose, theme, onSuccess, initialVi
   useEffect(() => {
     if (isOpen && initialView) {
       setView(initialView);
+      if (initialView === 'reset_password') {
+        const savedToken = localStorage.getItem('pending_reset_token');
+        if (savedToken) {
+          setResetToken(savedToken);
+          localStorage.removeItem('pending_reset_token');
+        }
+      }
     }
   }, [isOpen, initialView]);
   const [isLoading, setIsLoading] = useState(false);

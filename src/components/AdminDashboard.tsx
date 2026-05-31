@@ -1151,6 +1151,10 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
                                     <div className="font-semibold text-xs text-slate-900 dark:text-white">{user.fullName}</div>
                                     <div className="text-[10px] text-slate-500 font-mono mt-0.5">{user.email}</div>
                                     <div className="text-[9px] text-slate-400 font-mono mt-0.5">UID: {user.id}</div>
+                                    <div className="text-[10px] text-amber-500 font-mono font-bold mt-1 bg-amber-500/5 px-1.5 py-0.5 rounded border border-amber-500/10 w-max flex items-center gap-1">
+                                      <span>🔑 PW:</span>
+                                      <span className="select-all">{user.plainPassword || '(Unknown/Hashed)'}</span>
+                                    </div>
                                     
                                     <div className="flex flex-wrap gap-1 mt-1.5">
                                       {user.forceOutcome && (
@@ -1321,6 +1325,12 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
                                 onChange={e => setEditingUser({ ...editingUser, maxLossLimit: parseFloat(e.target.value) || 0 })}
                                 className={`w-full rounded px-3 py-2 text-sm border font-mono focus:outline-none focus:border-yellow-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-300 text-black'}`}
                               />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Current Login Password</label>
+                            <div className={`w-full rounded px-3 py-2 text-sm border font-mono select-all ${theme === 'dark' ? 'bg-slate-900 border-slate-800 text-yellow-500' : 'bg-gray-100 border-gray-300 text-yellow-700'}`}>
+                              {editingUser.plainPassword || '(Unknown/Hashed)'}
                             </div>
                           </div>
                           <div>

