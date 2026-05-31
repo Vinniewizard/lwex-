@@ -674,11 +674,23 @@ export default function CashierModal({
                 <input
                   id="cashier-amount-input"
                   type="number"
-                  min={activeTab === 'deposit' ? 1 : 10}
+                  min={activeTab === 'deposit' ? (gameSettings?.minDeposit ?? 1) : (gameSettings?.minWithdrawal ?? 10)}
                   max={50000}
                   disabled={activeTab === 'deposit' && depositAddress !== null}
-                  value={amount}
-                  onChange={(e) => handleAmountChange(Math.max(0, parseInt(e.target.value) || 0))}
+                  value={amount === 0 ? '' : amount}
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value);
+                    handleAmountChange(isNaN(parsed) ? 0 : parsed);
+                  }}
+                  onBlur={() => {
+                    const minD = gameSettings?.minDeposit ?? 1;
+                    const minW = gameSettings?.minWithdrawal ?? 10;
+                    const minLimit = activeTab === 'deposit' ? minD : minW;
+                    if (amount < minLimit) {
+                      setAmount(minLimit);
+                      setApiError(`Amount automatically set to the minimum limit of $${minLimit} USD.`);
+                    }
+                  }}
                   className="w-full bg-transparent font-mono text-base sm:text-sm font-bold focus:outline-none text-current"
                 />
               </div>
@@ -693,23 +705,30 @@ export default function CashierModal({
             {/* Quick Presets Grid */}
             {(!depositAddress || activeTab === 'withdraw') && (
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
-                {(activeTab === 'deposit' ? [10, 25, 100, 250] : [20, 50, 250, 1000]).map((val) => (
-                  <button
-                    id={`cashier-preset-${val}`}
-                    type="button"
-                    key={val}
-                    onClick={() => handleAmountChange(val)}
-                    className={`rounded border py-2.5 sm:py-2 text-[11px] sm:text-[10px] font-bold transition-all cursor-pointer ${
-                      amount === val
-                        ? 'bg-yellow-500 text-slate-950 border-yellow-500'
-                        : theme === 'dark'
-                          ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    ${val}
-                  </button>
-                ))}
+                {(() => {
+                  const minLimit = activeTab === 'deposit' ? (gameSettings?.minDeposit ?? 1) : (gameSettings?.minWithdrawal ?? 10);
+                  const rawPresets = activeTab === 'deposit' ? [10, 25, 100, 250] : [20, 50, 250, 1000];
+                  // Snap presets dynamically to at least the minimum, and keep them unique
+                  const uniquePresets = Array.from(new Set(rawPresets.map(preset => Math.max(minLimit, preset))));
+                  
+                  return uniquePresets.map((val) => (
+                    <button
+                      id={`cashier-preset-${val}`}
+                      type="button"
+                      key={val}
+                      onClick={() => handleAmountChange(val)}
+                      className={`rounded border py-2.5 sm:py-2 text-[11px] sm:text-[10px] font-bold transition-all cursor-pointer ${
+                        amount === val
+                          ? 'bg-yellow-500 text-slate-950 border-yellow-500'
+                          : theme === 'dark'
+                            ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      ${val}
+                    </button>
+                  ));
+                })()}
               </div>
             )}
 
@@ -994,7 +1013,7 @@ export default function CashierModal({
                           {/* Info footer */}
                           <div className="space-y-2 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
                             <p>
-                              Send funds using any cryptocurrency exchange or personal wallet. Direct account settings and billing links can be checked on <a href="https://account.nowpayments.io/" target="_blank" rel="noopener noreferrer" className="text-yellow-500 underline hover:text-yellow-400 font-bold">account.nowpayments.io</a>.
+                              Send funds using any cryptocurrency exchange or personal wallet.
                             </p>
                             <p className="font-bold text-slate-600 dark:text-slate-300">
                               Once successfully sent, click the 'Verify Blockchain Deposit' button below to automatically check confirms and credit your exchange balance immediately!

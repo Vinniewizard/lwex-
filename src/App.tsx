@@ -2609,6 +2609,7 @@ export default function App() {
             <PriceAlertsManager 
               theme={theme}
               activeAsset={activeAsset}
+              assetsRegistry={assetsRegistry}
               priceAlerts={priceAlerts}
               onAddAlert={handleAddPriceAlert}
               onDeleteAlert={handleDeletePriceAlert}

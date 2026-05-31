@@ -1216,12 +1216,18 @@ Active technical indicator values: ${indicatorsString}.`}`;
     }
   });
 
-  // API Route: Upload M-Pesa Receipt
+   // API Route: Upload M-Pesa Receipt
   app.post('/api/cashier/upload-receipt', upload.single('receipt'), async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     try {
       const { userId, amount, paymentMethod, message } = req.body;
       
+      const ledger = await loadCashierLedger();
+      const minDeposit = ledger.gameSettings?.minDeposit ?? 1.00;
+      if (Number(amount) < minDeposit) {
+        return res.status(400).json({ success: false, message: `Minimum deposit amount is $${minDeposit} USD.` });
+      }
+
       const db = getD1Database();
       const depositId = `dep-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
       const receiptPath = req.file ? `/uploads/${req.file.filename}` : null;
