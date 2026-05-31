@@ -24,6 +24,7 @@ import pg from 'pg';
 const { Pool } = pg;
 
 let pgPoolInstance: pg.Pool | null = null;
+let pgBootstrapPromise: Promise<void> | null = null;
 let d1DbInstance: any = null;
 let useSqliteFallback = false;
 let sqliteDbInstance: any = null;
@@ -459,7 +460,9 @@ function getD1Database() {
         if (client) client.release();
       }
     };
-    runPostgresBootstrap();
+    if (!pgBootstrapPromise) {
+      pgBootstrapPromise = runPostgresBootstrap();
+    }
 
     class PostgresPreparedStatement {
       private query: string;
@@ -475,6 +478,7 @@ function getD1Database() {
       }
 
       async first<T = any>(): Promise<T | null> {
+        if (pgBootstrapPromise) await pgBootstrapPromise;
         if (useSqliteFallback && localDb) {
           const res = await localDb.prepare(this.query).bind(...this.boundValues).first();
           return res as Promise<T | null>;
@@ -495,6 +499,7 @@ function getD1Database() {
       }
 
       async run(): Promise<{ success: boolean }> {
+        if (pgBootstrapPromise) await pgBootstrapPromise;
         if (useSqliteFallback && localDb) {
           return localDb.prepare(this.query).bind(...this.boundValues).run();
         }
@@ -513,6 +518,7 @@ function getD1Database() {
       }
 
       async all<T = any>(): Promise<{ results: T[] }> {
+        if (pgBootstrapPromise) await pgBootstrapPromise;
         if (useSqliteFallback && localDb) {
           const res = await localDb.prepare(this.query).bind(...this.boundValues).all();
           return res as Promise<{ results: T[] }>;

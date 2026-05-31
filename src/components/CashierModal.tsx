@@ -664,9 +664,14 @@ export default function CashierModal({
           <form id="cashier-action-form" onSubmit={handleSubmit} className="space-y-4">
             {/* Amount input block */}
             <div className="space-y-1.5">
-              <label htmlFor="cashier-amount-input" className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block tracking-wider">
-                USD Amount requested
-              </label>
+              <div className="flex justify-between items-end">
+                <label htmlFor="cashier-amount-input" className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block tracking-wider">
+                  USD Amount requested
+                </label>
+                <span className="text-[9px] font-bold text-yellow-500 uppercase tracking-widest bg-yellow-500/10 px-1.5 py-0.5 rounded">
+                  Min: ${activeTab === 'deposit' ? (gameSettings?.minDeposit ?? 1) : (gameSettings?.minWithdrawal ?? 10)} USD
+                </span>
+              </div>
               <div className={`flex rounded-md border items-center px-3 focus-within:border-yellow-500 min-h-12 sm:min-h-11 transition-colors ${
                 theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
               }`}>
@@ -858,7 +863,7 @@ export default function CashierModal({
                           <button
                             id="cashier-generate-address-btn"
                             type="button"
-                            disabled={isAddressLoading}
+                            disabled={isAddressLoading || amount < (gameSettings?.minDeposit ?? 1)}
                             onClick={handleGenerateDepositAddress}
                             className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-black text-xs uppercase tracking-widest py-3 px-4 rounded-lg transition-all cursor-pointer shadow-lg shadow-yellow-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
                           >
@@ -1175,7 +1180,7 @@ export default function CashierModal({
             <button
               id="cashier-submit-trigger"
               type="submit"
-              disabled={isProcessing || isAddressLoading}
+              disabled={isProcessing || isAddressLoading || (activeTab === 'deposit' && !depositAddress && paymentMethod === 'nowpayments' && amount < (gameSettings?.minDeposit ?? 1))}
               onClick={
                 activeTab === 'deposit' && paymentMethod === 'nowpayments' && !depositAddress 
                   ? (e) => { e.preventDefault(); handleGenerateDepositAddress(); } 
