@@ -275,8 +275,7 @@ function getD1Database() {
 
       // Avoid unhandled pool errors crashing node
       pgPoolInstance.on('error', (err) => {
-        console.error('[Database Setup] PostgreSQL pool error (routing to SQLite):', err);
-        useSqliteFallback = true;
+        console.error('[Database Setup] PostgreSQL pool error (ignoring to maintain connection):', err);
       });
     }
 
@@ -488,12 +487,7 @@ function getD1Database() {
           const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
           return res.rows.length > 0 ? (res.rows[0] as T) : null;
         } catch (err: any) {
-          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
-          useSqliteFallback = true;
-          if (localDb) {
-            const res = await localDb.prepare(this.query).bind(...this.boundValues).first();
-            return res as Promise<T | null>;
-          }
+          console.error('[Database Setup] Postgres SQL error:', err.message);
           throw err;
         }
       }
@@ -508,11 +502,7 @@ function getD1Database() {
           await pgPoolInstance!.query(pgQuery, this.boundValues);
           return { success: true };
         } catch (err: any) {
-          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
-          useSqliteFallback = true;
-          if (localDb) {
-            return localDb.prepare(this.query).bind(...this.boundValues).run();
-          }
+          console.error('[Database Setup] Postgres SQL error:', err.message);
           throw err;
         }
       }
@@ -528,12 +518,7 @@ function getD1Database() {
           const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
           return { results: res.rows as T[] };
         } catch (err: any) {
-          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
-          useSqliteFallback = true;
-          if (localDb) {
-            const res = await localDb.prepare(this.query).bind(...this.boundValues).all();
-            return res as Promise<{ results: T[] }>;
-          }
+          console.error('[Database Setup] Postgres SQL error:', err.message);
           throw err;
         }
       }
@@ -550,11 +535,7 @@ function getD1Database() {
         try {
           return pgPoolInstance!.query(query);
         } catch (err: any) {
-          console.error('[Database Setup] Postgres SQL exec error. Falling back to local SQLite:', err.message);
-          useSqliteFallback = true;
-          if (localDb) {
-            return localDb.exec(query);
-          }
+          console.error('[Database Setup] Postgres SQL exec error:', err.message);
           throw err;
         }
       }
