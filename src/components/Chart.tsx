@@ -139,6 +139,18 @@ export default function Chart({
     return () => observer.disconnect();
   }, []);
 
+  // Listen for Escape key to exit fullscreen mode
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullScreen]);
+
   // Compute Candles from Ticks for the candlestick view
   const candleInterval = 2000; // 2 seconds per candle
   const getCandles = (useHeikinAshi = false) => {
@@ -828,15 +840,19 @@ export default function Chart({
         {/* Full-Screen Toggle Button */}
         <button
           onClick={() => setIsFullScreen(!isFullScreen)}
-          className={`absolute top-3 right-3 z-50 rounded-lg p-2 transition-all cursor-pointer shadow-md border ${
+          className={`absolute top-3 right-3 z-50 rounded-lg p-2 transition-all cursor-pointer shadow-md border flex items-center space-x-1.5 ${
             isDark 
               ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800' 
               : 'bg-white border-gray-200 text-slate-500 hover:text-black hover:bg-gray-50'
           }`}
-          title={isFullScreen ? "Exit Full-Screen" : "Enter Full-Screen"}
+          title={isFullScreen ? "Exit Full-Screen [ESC]" : "Enter Full-Screen"}
         >
           {isFullScreen ? (
-            <Minimize2 className="h-4 w-4" />
+            <>
+              <Minimize2 className="h-4 w-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Exit Full Screen</span>
+              <kbd className="text-[9px] px-1 bg-slate-800/80 text-slate-400 rounded border border-slate-700/80 font-mono hidden sm:inline">ESC</kbd>
+            </>
           ) : (
             <Maximize2 className="h-4 w-4" />
           )}

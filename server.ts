@@ -24,240 +24,18 @@ const { Pool } = pg;
 
 let pgPoolInstance: pg.Pool | null = null;
 let d1DbInstance: any = null;
+let useSqliteFallback = false;
+let sqliteDbInstance: any = null;
 
 function convertQueryPlaceholders(query: string): string {
   let index = 1;
   return query.replace(/\?/g, () => `$${index++}`);
 }
 
-function getD1Database() {
-  if (d1DbInstance) return d1DbInstance;
+// Separate routine for initializing/bootstrapping SQLite safely
+function getSqliteInstance() {
+  if (sqliteDbInstance) return sqliteDbInstance;
 
-  const dbUrl = process.env.DATABASE_URL;
-  const isPostgres = dbUrl && (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
-
-  if (isPostgres) {
-    console.log(`[Database Setup] Connecting to cloud PostgreSQL database.`);
-    if (!pgPoolInstance) {
-      pgPoolInstance = new Pool({
-        connectionString: dbUrl,
-        ssl: { rejectUnauthorized: false }
-      });
-    }
-
-    // Bootstrap PostgreSQL schema
-    const runPostgresBootstrap = async () => {
-      const client = await pgPoolInstance!.connect();
-      try {
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            full_name TEXT,
-            account_type TEXT DEFAULT 'demo',
-            demo_balance REAL DEFAULT 10000.00,
-            real_balance REAL DEFAULT 0.00,
-            force_outcome TEXT DEFAULT '',
-            profit_target REAL DEFAULT 0.00,
-            max_win_limit REAL DEFAULT 0.00,
-            max_loss_limit REAL DEFAULT 0.00,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            last_login TEXT
-          );
-
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS force_outcome TEXT DEFAULT '';
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS profit_target REAL DEFAULT 0.00;
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS max_win_limit REAL DEFAULT 0.00;
-          ALTER TABLE users ADD COLUMN IF NOT EXISTS max_loss_limit REAL DEFAULT 0.00;
-
-
-          CREATE TABLE IF NOT EXISTS user_sessions (
-            session_id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            token TEXT UNIQUE NOT NULL,
-            created_at TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-          );
-
-          CREATE TABLE IF NOT EXISTS user_profiles (
-            user_id TEXT PRIMARY KEY,
-            phone TEXT,
-            country TEXT,
-            verification_status TEXT DEFAULT 'unverified',
-            two_factor_enabled INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-          );
-
-          CREATE TABLE IF NOT EXISTS credited_deposits (
-            tx_hash TEXT PRIMARY KEY,
-            amount REAL NOT NULL,
-            coin TEXT NOT NULL,
-            network TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            credited_at TEXT NOT NULL
-          );
-
-          CREATE TABLE IF NOT EXISTS withdrawals (
-            withdraw_order_id TEXT PRIMARY KEY,
-            amount REAL NOT NULL,
-            coin TEXT NOT NULL,
-            network TEXT NOT NULL,
-            address TEXT NOT NULL,
-            user_id TEXT NOT NULL,
-            requested_at TEXT NOT NULL,
-            binance_id TEXT
-          );
-
-          CREATE TABLE IF NOT EXISTS pending_deposits (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            amount REAL NOT NULL,
-            receipt_path TEXT,
-            message TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at TEXT NOT NULL,
-            payment_method TEXT NOT NULL
-          );
-
-          CREATE TABLE IF NOT EXISTS password_resets (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            token TEXT UNIQUE NOT NULL,
-            created_at TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            used INTEGER DEFAULT 0
-          );
-
-          CREATE TABLE IF NOT EXISTS referrals (
-            id TEXT PRIMARY KEY,
-            referrer_id TEXT NOT NULL,
-            referred_user_id TEXT NOT NULL,
-            created_at TEXT NOT NULL
-          );
-
-          CREATE TABLE IF NOT EXISTS group_chat_messages (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            author_name TEXT,
-            content TEXT,
-            is_bot INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            image_url TEXT
-          );
-
-          CREATE TABLE IF NOT EXISTS app_settings (
-            id TEXT PRIMARY KEY,
-            chat_enabled INTEGER DEFAULT 1
-          );
-          INSERT INTO app_settings (id, chat_enabled) VALUES ('global', 1) ON CONFLICT (id) DO NOTHING;
-
-          CREATE TABLE IF NOT EXISTS telegram_campaigns (
-            id TEXT PRIMARY KEY,
-            message TEXT NOT NULL,
-            interval_minutes INTEGER NOT NULL,
-            last_sent TEXT,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL
-          );
-
-          CREATE TABLE IF NOT EXISTS telegram_hunter_groups (
-            id TEXT PRIMARY KEY,
-            group_username TEXT NOT NULL,
-            group_name TEXT NOT NULL,
-            contacts_scanned INTEGER DEFAULT 0,
-            recruits_found INTEGER DEFAULT 0,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL
-          );
-
-          CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-          CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
-          CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
-        `);
-
-        // Seed initial values for campaigns and hunter groups
-        try {
-          const pgCampaignsCount = await client.query('SELECT COUNT(*) as count FROM telegram_campaigns');
-          if (Number(pgCampaignsCount.rows[0].count) === 0) {
-            await client.query(`
-              INSERT INTO telegram_campaigns (id, message, interval_minutes, is_active, created_at) VALUES
-              ('camp-1', '💸 Exclusive VIP Promo: Deposit $50+ today and get a +30% margin balance bonus immediately! Enter options contract code LW30 in cashier.', 30, 1, '${new Date().toISOString()}'),
-              ('camp-2', '🧠 Dynamic Wizard Signal Alert: Follow current MFLOW rise options trigger. RSI indicates strong upward momentum on the hourly chart!', 15, 1, '${new Date().toISOString()}')
-            `);
-          }
-        } catch (e) {}
-
-        try {
-          const pgHunterCount = await client.query('SELECT COUNT(*) as count FROM telegram_hunter_groups');
-          if (Number(pgHunterCount.rows[0].count) === 0) {
-            await client.query(`
-              INSERT INTO telegram_hunter_groups (id, group_username, group_name, contacts_scanned, recruits_found, is_active, created_at) VALUES
-              ('hunt-1', '@binary_options_elite_club', 'Binary Options Elite Club', 150, 42, 1, '${new Date().toISOString()}'),
-              ('hunt-2', '@deriv_signal_secrets', 'Deriv Option Secrets', 410, 89, 1, '${new Date().toISOString()}'),
-              ('hunt-3', '@crypto_leverage_hustlers', 'Crypto Leverage Hustlers', 85, 12, 1, '${new Date().toISOString()}')
-            `);
-          }
-        } catch (e) {}
-
-        console.log('[Database Setup] PostgreSQL schema and migrations complete.');
-      } catch (err) {
-        console.error('[Database Setup] Error running PostgreSQL migrations:', err);
-      } finally {
-        client.release();
-      }
-    };
-    runPostgresBootstrap();
-
-    class PostgresPreparedStatement {
-      private query: string;
-      private boundValues: any[] = [];
-
-      constructor(query: string) {
-        this.query = query;
-      }
-
-      bind(...values: any[]) {
-        this.boundValues = values.map((v) => (v === undefined ? null : v));
-        return this;
-      }
-
-      async first<T = any>(): Promise<T | null> {
-        const pgQuery = convertQueryPlaceholders(this.query);
-        const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
-        return res.rows.length > 0 ? (res.rows[0] as T) : null;
-      }
-
-      async run(): Promise<{ success: boolean }> {
-        const pgQuery = convertQueryPlaceholders(this.query);
-        await pgPoolInstance!.query(pgQuery, this.boundValues);
-        return { success: true };
-      }
-
-      async all<T = any>(): Promise<{ results: T[] }> {
-        const pgQuery = convertQueryPlaceholders(this.query);
-        const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
-        return { results: res.rows as T[] };
-      }
-    }
-
-    d1DbInstance = {
-      prepare(query: string) {
-        return new PostgresPreparedStatement(query);
-      },
-      exec(query: string) {
-        return pgPoolInstance!.query(query);
-      }
-    };
-
-    return d1DbInstance;
-  }
-
-  // SQLite fallback
   const dbPath = path.join(process.cwd(), 'lwex.db');
   console.log(`[D1 Setup] Connecting to SQLite database at: ${dbPath}`);
 
@@ -451,7 +229,7 @@ function getD1Database() {
       }
     }
 
-    d1DbInstance = {
+    sqliteDbInstance = {
       prepare(query: string) {
         const stmt = rawDb.prepare(query);
         return new D1PreparedStatementNode(stmt);
@@ -462,11 +240,320 @@ function getD1Database() {
     };
 
     console.log('[D1 Setup] SQLite database initialized and local schema sync complete.');
-    return d1DbInstance;
+    return sqliteDbInstance;
   } catch (error: any) {
     console.error('[D1 Setup] Failed to boot SQLite database:', error);
     throw error;
   }
+}
+
+function getD1Database() {
+  if (d1DbInstance) return d1DbInstance;
+
+  const dbUrl = process.env.DATABASE_URL;
+  const isPostgres = dbUrl && (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://'));
+
+  // Ensure local SQLite is parsed and ready as a standby fallback
+  let localDb: any = null;
+  try {
+    localDb = getSqliteInstance();
+  } catch (err) {
+    console.error('[D1 Setup] SQLite setup failed:', err);
+  }
+
+  if (isPostgres) {
+    console.log(`[Database Setup] Connecting to cloud PostgreSQL database.`);
+    if (!pgPoolInstance) {
+      pgPoolInstance = new Pool({
+        connectionString: dbUrl,
+        ssl: { rejectUnauthorized: false }
+      });
+
+      // Avoid unhandled pool errors crashing node
+      pgPoolInstance.on('error', (err) => {
+        console.error('[Database Setup] PostgreSQL pool error (routing to SQLite):', err);
+        useSqliteFallback = true;
+      });
+    }
+
+    // Bootstrap PostgreSQL schema asynchronously
+    const runPostgresBootstrap = async () => {
+      let client;
+      try {
+        client = await pgPoolInstance!.connect();
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT,
+            account_type TEXT DEFAULT 'demo',
+            demo_balance REAL DEFAULT 10000.00,
+            real_balance REAL DEFAULT 0.00,
+            force_outcome TEXT DEFAULT '',
+            profit_target REAL DEFAULT 0.00,
+            max_win_limit REAL DEFAULT 0.00,
+            max_loss_limit REAL DEFAULT 0.00,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login TEXT
+          );
+
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS force_outcome TEXT DEFAULT '';
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS profit_target REAL DEFAULT 0.00;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS max_win_limit REAL DEFAULT 0.00;
+          ALTER TABLE users ADD COLUMN IF NOT EXISTS max_loss_limit REAL DEFAULT 0.00;
+
+          CREATE TABLE IF NOT EXISTS user_sessions (
+            session_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          );
+
+          CREATE TABLE IF NOT EXISTS user_profiles (
+            user_id TEXT PRIMARY KEY,
+            phone TEXT,
+            country TEXT,
+            verification_status TEXT DEFAULT 'unverified',
+            two_factor_enabled INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+          );
+
+          CREATE TABLE IF NOT EXISTS credited_deposits (
+            tx_hash TEXT PRIMARY KEY,
+            amount REAL NOT NULL,
+            coin TEXT NOT NULL,
+            network TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            credited_at TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS withdrawals (
+            withdraw_order_id TEXT PRIMARY KEY,
+            amount REAL NOT NULL,
+            coin TEXT NOT NULL,
+            network TEXT NOT NULL,
+            address TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            requested_at TEXT NOT NULL,
+            binance_id TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS pending_deposits (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            amount REAL NOT NULL,
+            receipt_path TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            payment_method TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS password_resets (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used INTEGER DEFAULT 0
+          );
+
+          CREATE TABLE IF NOT EXISTS referrals (
+            id TEXT PRIMARY KEY,
+            referrer_id TEXT NOT NULL,
+            referred_user_id TEXT NOT NULL,
+            created_at TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS group_chat_messages (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            author_name TEXT,
+            content TEXT,
+            is_bot INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            image_url TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS app_settings (
+            id TEXT PRIMARY KEY,
+            chat_enabled INTEGER DEFAULT 1
+          );
+          INSERT INTO app_settings (id, chat_enabled) VALUES ('global', 1) ON CONFLICT (id) DO NOTHING;
+
+          CREATE TABLE IF NOT EXISTS telegram_campaigns (
+            id TEXT PRIMARY KEY,
+            message TEXT NOT NULL,
+            interval_minutes INTEGER NOT NULL,
+            last_sent TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS telegram_hunter_groups (
+            id TEXT PRIMARY KEY,
+            group_username TEXT NOT NULL,
+            group_name TEXT NOT NULL,
+            contacts_scanned INTEGER DEFAULT 0,
+            recruits_found INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+          CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+          CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
+        `);
+
+        // Seed initial values for campaigns and hunter groups
+        try {
+          const pgCampaignsCount = await client.query('SELECT COUNT(*) as count FROM telegram_campaigns');
+          if (Number(pgCampaignsCount.rows[0].count) === 0) {
+            await client.query(`
+              INSERT INTO telegram_campaigns (id, message, interval_minutes, is_active, created_at) VALUES
+              ('camp-1', '💸 Exclusive VIP Promo: Deposit $50+ today and get a +30% margin balance bonus immediately! Enter options contract code LW30 in cashier.', 30, 1, '${new Date().toISOString()}'),
+              ('camp-2', '🧠 Dynamic Wizard Signal Alert: Follow current MFLOW rise options trigger. RSI indicates strong upward momentum on the hourly chart!', 15, 1, '${new Date().toISOString()}')
+            `);
+          }
+        } catch (e) {}
+
+        try {
+          const pgHunterCount = await client.query('SELECT COUNT(*) as count FROM telegram_hunter_groups');
+          if (Number(pgHunterCount.rows[0].count) === 0) {
+            await client.query(`
+              INSERT INTO telegram_hunter_groups (id, group_username, group_name, contacts_scanned, recruits_found, is_active, created_at) VALUES
+              ('hunt-1', '@binary_options_elite_club', 'Binary Options Elite Club', 150, 42, 1, '${new Date().toISOString()}'),
+              ('hunt-2', '@deriv_signal_secrets', 'Deriv Option Secrets', 410, 89, 1, '${new Date().toISOString()}'),
+              ('hunt-3', '@crypto_leverage_hustlers', 'Crypto Leverage Hustlers', 85, 12, 1, '${new Date().toISOString()}')
+            `);
+          }
+        } catch (e) {}
+
+        console.log('[Database Setup] PostgreSQL schema and migrations complete.');
+      } catch (err: any) {
+        console.error('\n======================================================================');
+        console.error('[Database Setup] WARNING: PostgreSQL connection or migration failure!');
+        console.error('Error details:', err.message);
+        if (err.code === 'ENOTFOUND') {
+          console.error('\n👉 DIAGNOSIS: ONRENDER INTERNAL DATABASE URL ERROR');
+          console.error('The database host hostname "' + err.hostname + '" is Render\'s internal URL.');
+          console.error('Internal URLs only resolve if your Web Service is in the exact same region as your database.');
+          console.error('If you are testing locally or have deployed services across different regions, use the EXTERNAL Database Connection String instead.');
+          console.error('FIX: Paste your Render "External Database URL" into your Render DATABASE_URL environment setting.');
+        }
+        console.error('\n🛡️ SAFETY FALLBACK: Engaging local SQLite engine to keep exchange platform fully active.');
+        console.error('======================================================================\n');
+        useSqliteFallback = true;
+      } finally {
+        if (client) client.release();
+      }
+    };
+    runPostgresBootstrap();
+
+    class PostgresPreparedStatement {
+      private query: string;
+      private boundValues: any[] = [];
+
+      constructor(query: string) {
+        this.query = query;
+      }
+
+      bind(...values: any[]) {
+        this.boundValues = values.map((v) => (v === undefined ? null : v));
+        return this;
+      }
+
+      async first<T = any>(): Promise<T | null> {
+        if (useSqliteFallback && localDb) {
+          const res = await localDb.prepare(this.query).bind(...this.boundValues).first();
+          return res as Promise<T | null>;
+        }
+        try {
+          const pgQuery = convertQueryPlaceholders(this.query);
+          const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
+          return res.rows.length > 0 ? (res.rows[0] as T) : null;
+        } catch (err: any) {
+          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
+          useSqliteFallback = true;
+          if (localDb) {
+            const res = await localDb.prepare(this.query).bind(...this.boundValues).first();
+            return res as Promise<T | null>;
+          }
+          throw err;
+        }
+      }
+
+      async run(): Promise<{ success: boolean }> {
+        if (useSqliteFallback && localDb) {
+          return localDb.prepare(this.query).bind(...this.boundValues).run();
+        }
+        try {
+          const pgQuery = convertQueryPlaceholders(this.query);
+          await pgPoolInstance!.query(pgQuery, this.boundValues);
+          return { success: true };
+        } catch (err: any) {
+          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
+          useSqliteFallback = true;
+          if (localDb) {
+            return localDb.prepare(this.query).bind(...this.boundValues).run();
+          }
+          throw err;
+        }
+      }
+
+      async all<T = any>(): Promise<{ results: T[] }> {
+        if (useSqliteFallback && localDb) {
+          const res = await localDb.prepare(this.query).bind(...this.boundValues).all();
+          return res as Promise<{ results: T[] }>;
+        }
+        try {
+          const pgQuery = convertQueryPlaceholders(this.query);
+          const res = await pgPoolInstance!.query(pgQuery, this.boundValues);
+          return { results: res.rows as T[] };
+        } catch (err: any) {
+          console.error('[Database Setup] Postgres SQL error. Falling back to local SQLite:', err.message);
+          useSqliteFallback = true;
+          if (localDb) {
+            const res = await localDb.prepare(this.query).bind(...this.boundValues).all();
+            return res as Promise<{ results: T[] }>;
+          }
+          throw err;
+        }
+      }
+    }
+
+    d1DbInstance = {
+      prepare(query: string) {
+        return new PostgresPreparedStatement(query);
+      },
+      exec(query: string) {
+        if (useSqliteFallback && localDb) {
+          return localDb.exec(query);
+        }
+        try {
+          return pgPoolInstance!.query(query);
+        } catch (err: any) {
+          console.error('[Database Setup] Postgres SQL exec error. Falling back to local SQLite:', err.message);
+          useSqliteFallback = true;
+          if (localDb) {
+            return localDb.exec(query);
+          }
+          throw err;
+        }
+      }
+    };
+
+    return d1DbInstance;
+  }
+
+  d1DbInstance = localDb;
+  return d1DbInstance;
 }
 
 const storage = multer.diskStorage({
