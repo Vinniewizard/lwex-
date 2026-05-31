@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { X, Users, TrendingUp, DollarSign, ArrowDownCircle, BarChart2, Pin, PinOff, MessageSquare, Settings, Clock, Trash, Sparkles } from 'lucide-react';
+import { X, Users, TrendingUp, DollarSign, ArrowDownCircle, BarChart2, Pin, PinOff, MessageSquare, Settings, Clock, Trash, Sparkles, Search } from 'lucide-react';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ interface User {
   maxWinLimit?: number;
   maxLossLimit?: number;
   createdAt: string;
+  lastLogin?: string;
 }
 
 interface Stats {
@@ -78,6 +79,14 @@ interface GameSettings {
   cashoutMode?: 'enabled' | 'disabled' | 'smart';
 }
 
+const PREBUILT_GUIDES = {
+  overview: `<b>⚙️ LWEX Exchange - Operational Blueprint</b>\n\nLWEX is an high-performance synthetic options trading platform:\n\n• <b>Synthetic Price Feeds:</b> Features highly responsive tick indexes (e.g. MFLOW index) moving 24/7/365.\n• <b>Fast Options Expiration:</b> Enter transactions with expiration durations starting at just 10 seconds up to minutes.\n• <b>Calibrated Payouts:</b> Delivers profit yields of up to 95% on accurate price vector predictions (Rise/Fall).\n• <b>No-Risk Environment:</b> Preconditioned with fully managed demo training accounts.`,
+  register: `<b>🚀 How to Register & Onboard on LWEX</b>\n\nFollow these quick steps to set up your trading profile:\n\n1. Visit the LWEX Web Application Portal.\n2. Click <b>Register/Get Started</b> and fill in your Full Name, Email, and Phone Number (M-Pesa supported).\n3. Claim your pre-loaded <b>$25,678.91 USD</b> practice demo credits immediately!\n4. Link your Telegram Handle in your Profile Tab inside the console to listen to real-time notification alerts.`,
+  trade: `<b>📈 How to Trade Options on LWEX</b>\n\nLearn options forecasting in under 60 seconds:\n\n1. Check the active live price feed chart in the terminal center.\n2. In the top bar, toggle between <b>Demo Mode</b> or <b>Real Mode</b>.\n3. In the <b>Trade Controls</b>, select your Option Stake (e.g., $10 to $1,000) and expiration duration.\n4. Forecast the trend trajectory:\n   • Click <b>🟢 RISE / BUY UP</b> if you predict the price will settle higher than your entry.\n   • Click <b>🔴 FALL / BUY DOWN</b> if you predict it will settle lower.\n5. Watch the countdown. Upon option expiry, correct predictions credit your balance instantly!`,
+  deposit: `<b>💳 How to Make a Deposit (Crypto & M-Pesa)</b>\n\nFund your Real Wallet seamlessly using either option:\n\n• <b>Option A: Crypto Transfer (USDT Multi-Chain)</b>\n  1. Go to the <b>Cashier</b> -> Click **Deposit**.\n  2. Select your currency (USDT ERC20 / TRC20 / BEP20) to view your dedicated deposit address or scan the QR Code.\n  3. Send USDT from Binance, TrustWallet, or MetaMask. Click 'Verify Payment' in minutes.\n\n• <b>Option B: M-Pesa Paybill (Local Payments)</b>\n  1. Dial Lipa Na M-Pesa -> <b>Paybill</b>.\n  2. Enter Business Number <b>4323297</b>, and Account: <code>LWEX-YOUR_TELEGRAM</code>.\n  3. Pay your amount, capture a screenshot of the confirmation message.\n  4. Upload the receipt file into the Cashier modal. Admin credits your account in 5 minutes!`,
+  withdrawal: `<b>📥 How to Request a Withdrawal on LWEX</b>\n\nInitiate secure fund settlements anytime:\n\n1. Click on <b>Cashier</b> and navigate to the <b>Withdraw</b> tab.\n2. Ensure your active account is set to <b>Real Balance</b> mode and you have settled funds.\n3. Enter your Crypto standard network (USDT TRC-20 recommended for low fees) and input your destination wallet address.\n4. Verify your identity with your pre-set profile PIN or Two-Factor security challenge.\n5. Submit your withdrawal request. Requests are fully audited by the ledger and settled in 15–30 minutes!`
+};
+
 export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }: AdminDashboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -108,6 +117,8 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
   });
   const [isGameLoading, setIsGameLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<User & { newPassword?: string } | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userFilterStatus, setUserFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   // Telegram states
   const [tgLogs, setTgLogs] = useState<Array<{ id: string; sender: string; text: string; timestamp: string }>>([]);
@@ -962,67 +973,252 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
               </>
               )}
 
-              {activeTab === 'users' && (
-                <div>
-                  <h3 className="text-lg font-bold mb-4">Registered Users</h3>
-                  <div className="overflow-x-auto">
-                    <table className={`w-full text-sm border-collapse border rounded-lg overflow-hidden ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'}`}>
-                      <thead>
-                        <tr className={theme === 'dark' ? 'bg-slate-900' : 'bg-gray-100'}>
-                          <th className="border p-3 text-left font-bold">ID</th>
-                          <th className="border p-3 text-left font-bold">Email</th>
-                          <th className="border p-3 text-left font-bold">Name</th>
-                          <th className="border p-3 text-right font-bold">Demo Balance</th>
-                          <th className="border p-3 text-right font-bold">Real Balance</th>
-                          <th className="border p-3 text-left font-bold">Created</th>
-                          <th className="border p-3 text-center font-bold">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr key={user.id} className={theme === 'dark' ? 'hover:bg-slate-900/50' : 'hover:bg-gray-50'}>
-                            <td className="border p-3 text-xs font-mono">{user.id.substring(0, 8)}...</td>
-                            <td className="border p-3 text-xs">{user.email}</td>
-                            <td className="border p-3 text-xs">
-                              <div className="font-semibold">{user.fullName}</div>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {user.forceOutcome && (
-                                  <span className={`px-1 py-0.2 rounded text-[9px] font-bold uppercase leading-none ${user.forceOutcome === 'win' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-                                    Force: {user.forceOutcome}
-                                  </span>
-                                )}
-                                {user.profitTarget && user.profitTarget > 0 ? (
-                                  <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 leading-none">
-                                    Limit: ${user.profitTarget}
-                                  </span>
-                                ) : null}
-                                {user.maxWinLimit && user.maxWinLimit > 0 ? (
-                                  <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 leading-none">
-                                    MaxWin: ${user.maxWinLimit}
-                                  </span>
-                                ) : null}
-                                {user.maxLossLimit && user.maxLossLimit > 0 ? (
-                                  <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 leading-none">
-                                    MaxLoss: ${user.maxLossLimit}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </td>
-                            <td className="border p-3 text-right font-mono">${user.demoBalance.toFixed(2)}</td>
-                            <td className="border p-3 text-right font-mono">${user.realBalance.toFixed(2)}</td>
-                            <td className="border p-3 text-xs">{new Date(user.createdAt).toLocaleDateString()}</td>
-                            <td className="border p-3 text-center">
-                              <button
-                                onClick={() => setEditingUser({ ...user, newPassword: '' })}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold px-2 py-1 rounded text-[10px] uppercase transition-colors"
-                              >
-                                Edit
-                              </button>
-                            </td>
+              {activeTab === 'users' && (() => {
+                const totalRegistered = users.length;
+                const onlineCount = users.filter((u) => {
+                  if (!u.lastLogin) return false;
+                  return (Date.now() - new Date(u.lastLogin).getTime()) < 30000;
+                }).length;
+                const dormantCount = totalRegistered - onlineCount;
+
+                const filtered = users.filter((u) => {
+                  const query = userSearchQuery.toLowerCase().trim();
+                  const matchesSearch = !query || 
+                    u.email.toLowerCase().includes(query) ||
+                    u.fullName.toLowerCase().includes(query) ||
+                    u.id.toLowerCase().includes(query);
+
+                  if (!matchesSearch) return false;
+
+                  const isOnline = u.lastLogin ? (Date.now() - new Date(u.lastLogin).getTime()) < 30000 : false;
+                  if (userFilterStatus === 'active') {
+                    return isOnline;
+                  }
+                  if (userFilterStatus === 'inactive') {
+                    return !isOnline;
+                  }
+                  return true;
+                });
+
+                const formatLastSeen = (lastLogin?: string) => {
+                  if (!lastLogin) return 'Never';
+                  const diffMs = Date.now() - new Date(lastLogin).getTime();
+                  if (diffMs < 5000) return 'Just now';
+                  const diffSec = Math.floor(diffMs / 1000);
+                  if (diffSec < 60) return `${diffSec}s ago`;
+                  const diffMin = Math.floor(diffSec / 60);
+                  if (diffMin < 60) return `${diffMin}m ago`;
+                  const diffHr = Math.floor(diffMin / 60);
+                  if (diffHr < 24) return `${diffHr}h ago`;
+                  return new Date(lastLogin).toLocaleDateString() + ' ' + new Date(lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                };
+
+                return (
+                  <>
+                    <div className="space-y-6 text-left">
+                    {/* Header with quick stats */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h3 className="text-xl font-bold tracking-tight">User Management Terminal</h3>
+                        <p className="text-xs text-slate-500">Monitor client session presence, balances, and option constraints in real-time.</p>
+                      </div>
+                    </div>
+
+                    {/* Quick Metric Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className={`p-4 rounded-xl border text-left ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-gray-200'}`}>
+                        <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Onboarded Users</div>
+                        <div className="text-2xl font-mono font-bold mt-1 text-slate-900 dark:text-white">{totalRegistered}</div>
+                        <div className="text-[10px] text-slate-500 mt-1">Registered accounts in database</div>
+                      </div>
+
+                      <div className={`p-4 rounded-xl border text-left relative overflow-hidden ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-gray-200'}`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Online / Active Now</div>
+                            <div className="text-2xl font-mono font-bold mt-1 text-emerald-500 flex items-center gap-2">
+                              {onlineCount}
+                              <span className="relative flex h-3.5 w-3.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-1">Actively polling or trading in past 30s</div>
+                      </div>
+
+                      <div className={`p-4 rounded-xl border text-left ${theme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-gray-200'}`}>
+                        <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Inactive / Offline</div>
+                        <div className="text-2xl font-mono font-bold mt-1 text-amber-500">{dormantCount}</div>
+                        <div className="text-[10px] text-slate-500 mt-1">Dormant of line-status activity</div>
+                      </div>
+                    </div>
+
+                    {/* Filter and Search Bar */}
+                    <div className={`p-4 rounded-xl border space-y-4 ${theme === 'dark' ? 'bg-slate-950 border-slate-800' : 'bg-white border-gray-200'}`}>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <Search className="h-4 w-4 text-slate-400" />
+                          </span>
+                          <input
+                            type="text"
+                            placeholder="Search by ID, Username, Email, or Name..."
+                            value={userSearchQuery}
+                            onChange={(e) => setUserSearchQuery(e.target.value)}
+                            className={`w-full pl-9 pr-4 py-2 text-xs rounded-lg border focus:outline-none focus:border-indigo-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-gray-300 text-black'}`}
+                          />
+                          {userSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setUserSearchQuery('')}
+                              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Status Filter Tabs */}
+                        <div className="flex rounded-lg border border-slate-200 dark:border-slate-800 p-0.5 max-sm:w-full">
+                          <button
+                            type="button"
+                            onClick={() => setUserFilterStatus('all')}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-md tracking-wider flex-1 sm:flex-none transition-all ${userFilterStatus === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                          >
+                            All ({totalRegistered})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUserFilterStatus('active')}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-md tracking-wider flex-1 sm:flex-none transition-all flex items-center justify-center gap-1.5 ${userFilterStatus === 'active' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-slate-300'}`}
+                          >
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+                            Active ({onlineCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUserFilterStatus('inactive')}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase rounded-md tracking-wider flex-1 sm:flex-none transition-all ${userFilterStatus === 'inactive' ? 'bg-amber-600 text-slate-950' : 'text-slate-400 hover:text-slate-300'}`}
+                          >
+                            Inactive ({dormantCount})
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Table of Results */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                      <table className={`w-full text-sm border-collapse rounded-lg overflow-hidden ${theme === 'dark' ? 'border-slate-800' : 'border-gray-200'}`}>
+                        <thead>
+                          <tr className={theme === 'dark' ? 'bg-slate-900 border-b border-slate-800' : 'bg-gray-100 border-b border-gray-200'}>
+                            <th className="p-3 text-left font-bold text-xs uppercase tracking-wider text-slate-400">Status</th>
+                            <th className="p-3 text-left font-bold text-xs uppercase tracking-wider text-slate-400">User Identification</th>
+                            <th className="p-3 text-right font-bold text-xs uppercase tracking-wider text-slate-400">Demo Account</th>
+                            <th className="p-3 text-right font-bold text-xs uppercase tracking-wider text-slate-400">Real Account</th>
+                            <th className="p-3 text-left font-bold text-xs uppercase tracking-wider text-slate-400">Last Seen Activity</th>
+                            <th className="p-3 text-left font-bold text-xs uppercase tracking-wider text-slate-400">Created At</th>
+                            <th className="p-3 text-center font-bold text-xs uppercase tracking-wider text-slate-400">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {filtered.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="text-center py-8 text-xs text-slate-500 italic bg-white dark:bg-slate-900/10">No registered users matched the search filters.</td>
+                            </tr>
+                          ) : (
+                            filtered.map((user) => {
+                              const isOnline = user.lastLogin ? (Date.now() - new Date(user.lastLogin).getTime()) < 30000 : false;
+                              return (
+                                <tr key={user.id} className={`${theme === 'dark' ? 'hover:bg-slate-900/40 bg-slate-950/20' : 'hover:bg-gray-50 bg-white'} transition-colors`}>
+                                  {/* Dynamic presence status identifier */}
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-1.5 justify-start">
+                                      <span className="relative flex h-2 w-2">
+                                        {isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isOnline ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+                                      </span>
+                                      <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${isOnline ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-500/10 text-slate-400'}`}>
+                                        {isOnline ? 'ONLINE' : 'OFFLINE'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  
+                                  {/* Identity column */}
+                                  <td className="p-3 text-left">
+                                    <div className="font-semibold text-xs text-slate-900 dark:text-white">{user.fullName}</div>
+                                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">{user.email}</div>
+                                    <div className="text-[9px] text-slate-400 font-mono mt-0.5">UID: {user.id}</div>
+                                    
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {user.forceOutcome && (
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase border leading-normal ${user.forceOutcome === 'win' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                                          FORCED: {user.forceOutcome}
+                                        </span>
+                                      )}
+                                      {user.profitTarget && user.profitTarget > 0 ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 leading-normal">
+                                          TARGET: ${user.profitTarget}
+                                        </span>
+                                      ) : null}
+                                      {user.maxWinLimit && user.maxWinLimit > 0 ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 leading-normal">
+                                          MAX_WIN: ${user.maxWinLimit}
+                                        </span>
+                                      ) : null}
+                                      {user.maxLossLimit && user.maxLossLimit > 0 ? (
+                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 leading-normal">
+                                          MAX_LOSS: ${user.maxLossLimit}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </td>
+
+                                  {/* balances */}
+                                  <td className="p-3 text-right font-mono text-xs font-semibold text-slate-800 dark:text-slate-300">
+                                    ${user.demoBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+
+                                  <td className="p-3 text-right font-mono text-xs font-bold">
+                                    <span className={user.realBalance > 0 ? 'text-emerald-500' : 'text-slate-500'}>
+                                      ${user.realBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                  </td>
+
+                                  {/* activity logs */}
+                                  <td className="p-3 text-xs text-left">
+                                    <div className="font-semibold text-slate-800 dark:text-slate-300">
+                                      {formatLastSeen(user.lastLogin)}
+                                    </div>
+                                    {user.lastLogin && (
+                                      <div className="text-[9px] text-slate-500 font-mono mt-0.5">
+                                        Synced: {new Date(user.lastLogin).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second: '2-digit'})}
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="p-3 text-xs text-slate-500 text-left">
+                                    {new Date(user.createdAt).toLocaleDateString()}
+                                  </td>
+
+                                  <td className="p-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingUser({ ...user, newPassword: '' })}
+                                      className="bg-yellow-500 hover:bg-yellow-600 text-slate-950 font-bold px-2.5 py-1 rounded text-[10px] uppercase tracking-wider transition-all shadow hover:shadow-yellow-500/10 border-none cursor-pointer border"
+                                    >
+                                      Edit Details
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   {/* Edit User Form/Modal Inline */}
@@ -1149,8 +1345,9 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
                       </div>
                     </div>
                   )}
-                </div>
-              )}
+                </>
+              );
+            })()}
 
               {activeTab === 'deposits' && (
                 <div className="space-y-4">
@@ -1889,6 +2086,28 @@ export default function AdminDashboard({ isOpen, onClose, theme, triggerToast }:
                           >
                             Alert
                           </button>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1 text-left">Quick-select Guide Manual</label>
+                          <select
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val && val in PREBUILT_GUIDES) {
+                                setCustomBroadcast(PREBUILT_GUIDES[val as keyof typeof PREBUILT_GUIDES]);
+                                setBroadcastType('campaign');
+                              } else {
+                                setCustomBroadcast('');
+                              }
+                            }}
+                            className={`w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none cursor-pointer`}
+                          >
+                            <option value="">-- Select a Procedure Guide to Auto-Fill --</option>
+                            <option value="overview">⚙️ Platform Operational Blueprint</option>
+                            <option value="register">🚀 Procedure: How to Register & Onboard</option>
+                            <option value="trade">📈 Procedure: How to Trade Options</option>
+                            <option value="deposit">💳 Procedure: How to Deposit (USDT & M-Pesa)</option>
+                            <option value="withdrawal">📥 Procedure: How to Withdraw Profits</option>
+                          </select>
                         </div>
                         <textarea
                           placeholder="Type your official announcement here..."

@@ -1700,7 +1700,7 @@ Active technical indicator values: ${indicatorsString}.`}`;
 
       let responseText = '';
       if (text.startsWith('/start') || text.toLowerCase().includes('hello') || text.toLowerCase().includes('hi ')) {
-        responseText = `<b>🔮 Welcome to LWEX Exchange Official Portal Bot!</b>\n\nGuiding users into derivatives mastery with zero-loss training.\n\n📈 <b>Active Synthetic Index:</b> MFLOW\n💰 <b>Demo balance pre-loaded:</b> $25,678.91 USDT\n\n<b>Commands available:</b>\n/register — Claim free demo credentials & registration link\n/signals — Scan technical oracle signals\n/mflow — Probe active index stats\n/help — Show interface directives`;
+        responseText = `<b>🔮 Welcome to LWEX Exchange Official Portal Bot!</b>\n\nGuiding users into derivatives mastery with zero-loss training.\n\n📈 <b>Active Synthetic Index:</b> MFLOW\n💰 <b>Demo balance pre-loaded:</b> $25,678.91 USDT\n\n<b>Commands available:</b>\n/register — Claim free demo credentials & registration link\n/signals — Scan technical oracle signals\n/mflow — Probe active index stats\n/guides — Access complete platform instruction manuals\n/help — Show interface directives`;
       } else if (text.startsWith('/register') || text.toLowerCase().includes('register') || text.toLowerCase().includes('signup')) {
         const appUrl = 'https://lwex.onrender.com/';
         responseText = `<b>🚀 Start Binary & Index Trading on LWEX!</b>\n\n1. Open: ${appUrl}\n2. Enter registration profile parameters.\n3. Instantly claim <b>$25,678.91 USDT</b> practice capital!\n4. Link handle inside options console for live notification webhooks.`;
@@ -1717,8 +1717,20 @@ Active technical indicator values: ${indicatorsString}.`}`;
         responseText = `<b>📈 Wizard Bot Technical Prediction:</b>\n\n• <b>Asset:</b> MFLOW Index\n• <b>Action:</b> 🟢 BUY RISE\n• <b>Immediate Support:</b> $25,621.00\n• <b>Target resistance:</b> $25,710.00\n• <b>Confidence Index:</b> 84%\n\n<i>Oracle Notes: RSI moving average indicates oversold condition. Strong up-trend in option volume.</i>`;
       } else if (text.startsWith('/mflow') || text.toLowerCase().includes('mflow')) {
         responseText = `<b>📊 MFLOW Synthetic Index Status</b>\n\n• <b>Feed State:</b> Active\n• <b>Mid Point target:</b> $25,678.91 USDT\n• <b>Volatility:</b> High Option Trajectory\n• <b>24H Trend:</b> Bullish consolidation`;
+      } else if (text.startsWith('/guides') || text.startsWith('/guide')) {
+        responseText = `<b>📖 LWEX Platform Interactive Handbooks</b>\n\nClick any command below to load step-by-step procedures immediately:\n\n⚙️ /guide_overview — Platform Mechanism & Details\n🚀 /guide_register — How to Register & Onboard\n📈 /guide_trade — How to Trade & Place Options\n💳 /guide_deposit — How to make deposits (Crypto & M-Pesa)\n📥 /guide_withdrawal — How to request Withdrawals\n\n<i>Tip: Admin can broadcast these manuals anytime from the Dashboard.</i>`;
+      } else if (text.startsWith('/guide_overview')) {
+        responseText = `<b>⚙️ LWEX Exchange - Operational Blueprint</b>\n\nLWEX is an high-performance synthetic options trading platform:\n\n• <b>Synthetic Price Feeds:</b> Features highly responsive tick indexes (e.g. MFLOW index) moving 24/7/365.\n• <b>Fast Options Expiration:</b> Enter transactions with expiration durations starting at just 10 seconds up to minutes.\n• <b>Calibrated Payouts:</b> Delivers profit yields of up to 95% on accurate price vector predictions (Rise/Fall).\n• <b>No-Risk Environment:</b> Preconditioned with fully managed demo training accounts.`;
+      } else if (text.startsWith('/guide_register')) {
+        responseText = `<b>🚀 How to Register & Onboard on LWEX</b>\n\nFollow these quick steps to set up your trading profile:\n\n1. Visit the LWEX Web Application Portal.\n2. Click <b>Register/Get Started</b> and fill in your Full Name, Email, and Phone Number (M-Pesa supported).\n3. Claim your pre-loaded <b>$25,678.91 USD</b> practice demo credits immediately!\n4. Link your Telegram Handle in your Profile Tab inside the console to listen to real-time notification alerts.`;
+      } else if (text.startsWith('/guide_trade')) {
+        responseText = `<b>📈 How to Trade Options on LWEX</b>\n\nLearn options forecasting in under 60 seconds:\n\n1. Check the active live price feed chart in the terminal center.\n2. In the top bar, toggle between <b>Demo Mode</b> or <b>Real Mode</b>.\n3. In the <b>Trade Controls</b>, select your Option Stake (e.g., $10 to $1,000) and expiration duration.\n4. Forecast the trend trajectory:\n   • Click <b>🟢 RISE / BUY UP</b> if you predict the price will settle higher than your entry.\n   • Click <b>🔴 FALL / BUY DOWN</b> if you predict it will settle lower.\n5. Watch the countdown. Upon option expiry, correct predictions credit your balance instantly!`;
+      } else if (text.startsWith('/guide_deposit')) {
+        responseText = `<b>💳 How to Make a Deposit (Crypto & M-Pesa)</b>\n\nFund your Real Wallet seamlessly using either option:\n\n• <b>Option A: Crypto Transfer (USDT Multi-Chain)</b>\n  1. Go to the <b>Cashier</b> -> Click **Deposit**.\n  2. Select your currency (USDT ERC20 / TRC20 / BEP20) to view your dedicated deposit address or scan the QR Code.\n  3. Send USDT from Binance, TrustWallet, or MetaMask. Click 'Verify Payment' in minutes.\n\n• <b>Option B: M-Pesa Paybill (Local Payments)</b>\n  1. Dial Lipa Na M-Pesa -> <b>Paybill</b>.\n  2. Enter Business Number <b>4323297</b>, and Account: <code>LWEX-${userHandle}</code>.\n  3. Pay your amount, capture a screenshot of the confirmation message.\n  4. Upload the receipt file into the Cashier modal. Admin credits your account in 5 minutes!`;
+      } else if (text.startsWith('/guide_withdrawal')) {
+        responseText = `<b>📥 How to Request a Withdrawal on LWEX</b>\n\nInitiate secure fund settlements anytime:\n\n1. Click on <b>Cashier</b> and navigate to the <b>Withdraw</b> tab.\n2. Ensure your active account is set to <b>Real Balance</b> mode and you have settled funds.\n3. Enter your Crypto standard network (USDT TRC-20 recommended for low fees) and input your destination wallet address.\n4. Verify your identity with your pre-set profile PIN or Two-Factor security challenge.\n5. Submit your withdrawal request. Requests are fully audited by the ledger and settled in 15–30 minutes!`;
       } else if (text.startsWith('/help')) {
-        responseText = `<b>🤖 Wizard Bot Command Manual:</b>\n\n• /start — Welcome dashboard\n• /register — Onboard profile link\n• /signals — Live AI technical advice\n• /mflow — Retrieve synthetic index status`;
+        responseText = `<b>🤖 Wizard Bot Command Manual:</b>\n\n• /start — Welcome dashboard\n• /register — Onboard profile link\n• /signals — Live AI technical advice\n• /mflow — Retrieve synthetic index status\n• /guides — Interactive step-by-step procedures`;
       } else if (text.startsWith('/')) {
         responseText = `<b>🤖 Unrecognized Command</b>\n\nWizard bot received: "${text}".\nUse /help to see available commands.`;
       }
@@ -2773,7 +2785,7 @@ Active technical indicator values: ${indicatorsString}.`}`;
       }
 
       const db = getD1Database();
-      const usersRes = await db.prepare('SELECT id, email, full_name, demo_balance, real_balance, created_at, force_outcome, profit_target, max_win_limit, max_loss_limit FROM users').all();
+      const usersRes = await db.prepare('SELECT id, email, full_name, demo_balance, real_balance, created_at, force_outcome, profit_target, max_win_limit, max_loss_limit, last_login FROM users').all();
       const users = (usersRes?.results || []).map((u: any) => ({
         id: u.id,
         email: u.email,
@@ -2784,7 +2796,8 @@ Active technical indicator values: ${indicatorsString}.`}`;
         profitTarget: u.profit_target,
         maxWinLimit: u.max_win_limit || 0.00,
         maxLossLimit: u.max_loss_limit || 0.00,
-        createdAt: u.created_at
+        createdAt: u.created_at,
+        lastLogin: u.last_login
       }));
 
       return res.json({
@@ -3013,6 +3026,10 @@ Active technical indicator values: ${indicatorsString}.`}`;
       if (userId) {
         try {
           const db = getD1Database();
+          const nowISO = new Date().toISOString();
+          // Periodically update user's last dynamic interaction timestamp to track active state
+          await db.prepare('UPDATE users SET last_login = ?, updated_at = ? WHERE id = ?').bind(nowISO, nowISO, userId).run();
+
           const user = await db.prepare('SELECT id, email, full_name, demo_balance, real_balance, force_outcome, profit_target, max_win_limit, max_loss_limit, created_at FROM users WHERE id = ?').bind(userId).first();
           if (user) {
             userOverride = {
