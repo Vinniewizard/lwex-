@@ -120,10 +120,8 @@ export default function App() {
     }
   }, [theme]);
 
-  // Account states: Pre-loaded with lucasantiago818 on first visit
+  // Account states: Loaded from storage
   const [currentUser, setCurrentUser] = useState<any>(() => {
-    const isLoggedOut = localStorage.getItem('lwex_logged_out') === 'true';
-    if (isLoggedOut) return null;
     const saved = localStorage.getItem('lwex_current_user');
     if (saved) {
       try {
@@ -132,20 +130,8 @@ export default function App() {
         console.error('Failed to parse current user from storage', e);
       }
     }
-    // Default user on first load
-    return {
-      id: "lucasantiago_default",
-      email: "lucasantiago818@gmail.com",
-      fullName: "lucasantiago818",
-      phone: "+254712345678",
-      country: "Kenya",
-      balance: 25678.91,
-      accountType: "demo",
-      forceOutcome: "",
-      profitTarget: 0.00,
-      maxWinLimit: 0.00,
-      maxLossLimit: 0.00
-    };
+    // Default to logged out on first load for new users to prevent credential overlap
+    return null;
   });
 
   const [account, setAccount] = useState<Account>(() => {
@@ -157,12 +143,12 @@ export default function App() {
         console.error('Failed to parse account from storage', e);
       }
     }
-    // Match the pre-loaded lucasantiago818 default balance if there was no saved session
+    // Default logged-out visitor demo account configuration
     return {
       mode: 'demo',
-      balance: 25678.91,
+      balance: 10000.00,
       currency: 'USD',
-      id: 'm-ac-lucasantiago_default'
+      id: 'demo-temp-acc'
     };
   });
 
@@ -1101,7 +1087,7 @@ export default function App() {
   const handleOpenCashierWithTab = (tab: 'deposit' | 'withdraw') => {
     if (!currentUser) {
       triggerToast("Authentication required. Please login or register to access the cashier.", false);
-      setIsAuthOpen(true);
+      handleTriggerAuth('login');
       return;
     }
     setCashierDefaultTab(tab);
@@ -1287,7 +1273,7 @@ export default function App() {
           </div>
         ) : (
           <div 
-            onClick={() => setIsAuthOpen(true)}
+            onClick={() => handleTriggerAuth('login')}
             className={`p-4 mx-3 my-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center transition-colors cursor-pointer justify-center ${desktopSidebarCollapsed ? 'p-2' : 'space-x-2'}`}
             title="Click to sign in"
           >
@@ -1297,7 +1283,7 @@ export default function App() {
             {!desktopSidebarCollapsed && (
               <div className="text-left flex-1 min-w-0">
                 <span className="text-xs font-black text-amber-500 block uppercase tracking-wider">Access Account</span>
-                <span className="text-[9px] text-slate-400 block font-semibold truncate">Sign in or register now</span>
+                <span className="text-[9px] text-slate-400 block font-semibold truncate font-semibold block truncate">Sign in or register now</span>
               </div>
             )}
           </div>
@@ -1853,7 +1839,7 @@ export default function App() {
                   </>
                 ) : (
                   <button 
-                    onClick={() => setIsAuthOpen(true)}
+                    onClick={() => handleTriggerAuth('login')}
                     className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-lg text-[10px] sm:text-xs uppercase tracking-wider transition-all shadow-md shadow-amber-500/15 cursor-pointer shrink-0"
                   >
                     Sign In

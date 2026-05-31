@@ -1462,10 +1462,8 @@ Active technical indicator values: ${indicatorsString}.`}`;
       }
 
       let forceOutcomeCleared = false;
-      if (consumeForceOutcome) {
-        await db.prepare("UPDATE users SET force_outcome = '', updated_at = ? WHERE id = ?").bind(now, userId).run();
-        forceOutcomeCleared = true;
-      }
+      // Admin requested: Let the settings set by the admin remain running until they reset again.
+      // So we do not automatically clear force_outcome upon trade settlement.
 
       return res.json({ 
         success: true, 
