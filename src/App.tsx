@@ -217,7 +217,21 @@ export default function App() {
   const [chartType, setChartType] = useState<'line' | 'candles'>('candles');
 
   // Contracts & History Log portfolios
-  const [activeContracts, setActiveContracts] = useState<Contract[]>([]);
+  const [activeContracts, setActiveContracts] = useState<Contract[]>(() => {
+    const saved = localStorage.getItem('lwex_active_contracts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Adjust status or filter out expired if needed, but the tick loop handles it
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse active contracts from localStorage', e);
+      }
+    }
+    return [];
+  });
   const [tradeHistory, setTradeHistory] = useState<TradeHistoryItem[]>(() => {
     const saved = localStorage.getItem('lwex_history');
     if (saved) {
@@ -291,6 +305,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('lwex_account', JSON.stringify(account));
     localStorage.setItem('lwex_history', JSON.stringify(tradeHistory));
+    localStorage.setItem('lwex_active_contracts', JSON.stringify(activeContracts));
     localStorage.setItem('lwex_real_balance', String(realAccountBalance));
     localStorage.setItem('lwex_price_alerts', JSON.stringify(priceAlerts));
     if (currentUser) {
@@ -300,7 +315,7 @@ export default function App() {
       localStorage.removeItem('lwex_current_user');
       localStorage.setItem('lwex_logged_out', 'true');
     }
-  }, [account, tradeHistory, realAccountBalance, currentUser, priceAlerts]);
+  }, [account, tradeHistory, activeContracts, realAccountBalance, currentUser, priceAlerts]);
 
   // Modals & Panels Switches
   const [isCashierOpen, setIsCashierOpen] = useState(false);
@@ -705,7 +720,10 @@ export default function App() {
           const nextPrice = nextPricesMap[contract.assetId];
           if (nextPrice === undefined || contract.status !== 'active') return contract;
 
-          const ticksPassed = contract.ticksPassed + 1;
+          let ticksPassed = contract.ticksPassed + 1;
+          if (contract.durationUnit !== 'ticks') {
+            ticksPassed = Math.floor((now - contract.entryTime) / 1000);
+          }
           
           let totalDurationInSeconds = contract.duration;
           if (contract.durationUnit === 'minutes') {
@@ -713,8 +731,13 @@ export default function App() {
           } else if (contract.durationUnit === 'ticks') {
             totalDurationInSeconds = contract.duration; // 1 tick = 1 second
           }
-          
-          const isExpired = ticksPassed >= totalDurationInSeconds;
+
+          let isExpired = false;
+          if (contract.durationUnit === 'ticks') {
+            isExpired = ticksPassed >= totalDurationInSeconds;
+          } else {
+            isExpired = now >= contract.expiryTime;
+          }
 
           // Proximity checks for profit
           let currentProfit = 0;
@@ -835,7 +858,12 @@ export default function App() {
             return null as any;
           }
 
-          const ratioRemaining = (totalDurationInSeconds - ticksPassed) / totalDurationInSeconds;
+          let ratioRemaining = 0;
+          if (contract.durationUnit === 'ticks') {
+            ratioRemaining = Math.max(0, (totalDurationInSeconds - ticksPassed) / totalDurationInSeconds);
+          } else {
+            ratioRemaining = Math.max(0, (contract.expiryTime - now) / (contract.expiryTime - contract.entryTime));
+          }
           const baseSell = contract.stake * 0.90;
           const sellPrice = currentProfit >= 0
             ? baseSell + currentProfit * (1 - ratioRemaining * 0.4)
@@ -938,6 +966,12 @@ export default function App() {
       barrier = isUpDir ? latestPrice + config.barrierOffset : latestPrice - config.barrierOffset;
     }
 
+    const getDurationMs = (duration: number, unit: 'ticks' | 'seconds' | 'minutes') => {
+      if (unit === 'minutes') return duration * 60 * 1000;
+      if (unit === 'seconds') return duration * 1000;
+      return duration * 1000;
+    };
+
     const newContract: Contract = {
       id: `mt-${Math.random().toString(36).substring(2, 12)}`,
       assetId: activeAsset.id,
@@ -954,7 +988,7 @@ export default function App() {
       entryTime: Date.now(),
       duration: config.duration,
       durationUnit: config.durationUnit,
-      expiryTime: Date.now() + config.duration * 1000,
+      expiryTime: Date.now() + getDurationMs(config.duration, config.durationUnit),
       status: 'active',
       currentPrice: latestPrice,
       currentProfit: 0,

@@ -155,9 +155,9 @@ export default function PositionsList({
                       {/* Duration Progress */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[9px] text-gray-400 font-bold uppercase">
-                          <span>Ticks Completed</span>
+                          <span>Elapsed Time</span>
                           <span className="font-mono">
-                            {contract.ticksPassed} / {contract.duration} {contract.durationUnit}
+                            {contract.ticksPassed}s / {contract.durationUnit === 'minutes' ? contract.duration * 60 : contract.durationUnit === 'seconds' ? contract.duration : contract.duration}s
                           </span>
                         </div>
                         {isTickUnit ? (
@@ -174,8 +174,8 @@ export default function PositionsList({
                         ) : (
                           <div className={`w-full rounded-full h-1 ${isDark ? 'bg-zinc-800' : 'bg-gray-100'}`}>
                             <div
-                              className="bg-black h-1 rounded-full transition-all duration-300"
-                              style={{ width: `${(contract.ticksPassed / contract.duration) * 100}%` }}
+                              className={`${isDark ? 'bg-amber-500' : 'bg-black'} h-1 rounded-full transition-all duration-300 max-w-full`}
+                              style={{ width: `${Math.min(100, Math.max(0, (contract.ticksPassed / (contract.durationUnit === 'minutes' ? contract.duration * 60 : contract.duration)) * 100))}%` }}
                             />
                           </div>
                         )}
