@@ -1453,11 +1453,11 @@ export default function App() {
                 ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/10' 
                 : 'text-slate-450 hover:bg-slate-900/50 hover:text-white'
             }`}
-            title={desktopSidebarCollapsed ? "AI Grid Bot" : undefined}
+            title={desktopSidebarCollapsed ? "Wizard Bot" : undefined}
           >
             <div className={`flex items-center ${desktopSidebarCollapsed ? '' : 'space-x-3'}`}>
               <Bot className="w-4 h-4 text-purple-400 shrink-0 animate-pulse" />
-              {!desktopSidebarCollapsed && <span>AI Grid Bot</span>}
+              {!desktopSidebarCollapsed && <span>Wizard Bot</span>}
             </div>
             {!desktopSidebarCollapsed && (
               <span className="text-[8px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full shrink-0">NEW</span>
@@ -2580,17 +2580,17 @@ export default function App() {
               <div>
                 <span className="inline-flex items-center space-x-1.5 bg-purple-500/25 border border-purple-500/30 text-purple-300 rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider block w-max">
                   <Bot className="w-3 h-3 animate-spin text-purple-400" />
-                  <span>AI Arbitrage Bot Active</span>
+                  <span>Wizard Bot Active</span>
                 </span>
-                <h3 className="text-xs font-black text-white uppercase tracking-wide mt-2">DEPLOY AI STRATEGIES</h3>
-                <p className="text-[10px] text-slate-400 mt-1">Configure grid arbitrage parameters, multi-barrier indices strategies, and cash out targets mechanically.</p>
+                <h3 className="text-xs font-black text-white uppercase tracking-wide mt-2">SMART TRADING SIGNALS</h3>
+                <p className="text-[10px] text-slate-400 mt-1">Get real-time insights, standard binary options strategies, and chat with members.</p>
               </div>
 
               <button 
                 onClick={() => setIsCopilotOpen(true)}
                 className="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 hover:border-indigo-400 font-extrabold text-white text-[10px] uppercase py-2 tracking-wider rounded transition-all text-center select-none shadow-[0_4px_12px_rgba(79,70,229,0.3)] animate-pulse"
               >
-                Launch AI Grid Board
+                Open Wizard Bot
               </button>
             </div>
 

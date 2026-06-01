@@ -76,9 +76,9 @@ export default function WizardBot({
   onTriggerAuth,
   triggerToast
 }: CopilotProps) {
-  const isAdmin = currentUser?.email?.toLowerCase().includes('admin') || 
-                  currentUser?.email?.toLowerCase().includes('peterchristine') || 
-                  currentUser?.email?.toLowerCase().includes('lucasantiago');
+  const isAdmin = currentUser?.email === 'admin@lwex.com' ||
+                  currentUser?.email === 'peterchristine' ||
+                  currentUser?.email === 'lucasantiago';
 
   // Navigation tabs:
   const [botTab, setBotTab] = useState<'signals' | 'telegram' | 'onboard' | 'qa' | 'ads' | 'notifs' | 'group'>('signals');
